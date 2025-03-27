@@ -7,7 +7,7 @@ from aiogram.types import Message
 from sqlalchemy import insert
 
 from database.connect import get_async_session
-from database.models import User
+from database.models import User, UserPoint
 from lexicons.lexicon_register_ru import LEXICON_REGISTER_RU
 from services.database_services import check_user_exists
 
@@ -57,8 +57,15 @@ async def register_age(message: Message, state: FSMContext):
             name=data.get("name").title(),
             surname=data.get("surname").title(),
             age=data.get("age")
+        ).returning(User.id)
+        user = await session.execute(user_query)
+
+        point_query = insert(UserPoint).values(
+            user_id=user.scalar_one(),
+            points=0
         )
-        await session.execute(user_query)
+        await session.execute(point_query)
+
         await session.commit()
 
     await state.clear()
