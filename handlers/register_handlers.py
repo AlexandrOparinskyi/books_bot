@@ -4,8 +4,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
+from sqlalchemy import insert
 
+from database.connect import get_async_session
+from database.models import User
 from lexicons.lexicon_register_ru import LEXICON_REGISTER_RU
+from services.database_services import check_user_exists
 
 register_router = Router()
 storage = MemoryStorage()
@@ -18,6 +22,10 @@ class RegisterState(StatesGroup):
 
 @register_router.message(Command(commands="register"))
 async def start_register(message: Message, state: FSMContext):
+    if await check_user_exists(message.from_user.id):
+        await message.answer(LEXICON_REGISTER_RU["user_exists"])
+        return
+
     await state.set_state(RegisterState.name)
     await message.answer(LEXICON_REGISTER_RU[message.text])
 
@@ -40,6 +48,19 @@ async def error_register_name(message: Message):
                          lambda x: x.text.isdigit() and 0 < int(x.text) < 100)
 async def register_age(message: Message, state: FSMContext):
     await state.update_data({"age": int(message.text)})
+
+    async with get_async_session() as session:
+        data = await state.get_data()
+        user_query = insert(User).values(
+            user_id=message.from_user.id,
+            username=message.from_user.username,
+            name=data.get("name").title(),
+            surname=data.get("surname").title(),
+            age=data.get("age")
+        )
+        await session.execute(user_query)
+        await session.commit()
+
     await state.clear()
     await message.answer(LEXICON_REGISTER_RU["register_age"])
 
