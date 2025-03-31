@@ -1,9 +1,5 @@
-from uuid import uuid4
-
-from slugify import slugify
 from sqlalchemy import (Column, Integer, BigInteger,
                         String, Boolean, ForeignKey)
-from sqlalchemy.event import listens_for
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 

@@ -1,20 +1,18 @@
-from importlib.metadata import pass_none
-
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, CallbackQuery
-from pyexpat.errors import messages
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select
 
 from database.connect import get_async_session
 from database.models import Book, BookPoint, UserPoint
-from keyboards.book_keyboards import create_list_book_keyboard, create_time_keyboard
+from filters.book_filters import BookTimeFilter
+from keyboards.book_keyboards import create_list_book_keyboard, \
+    create_time_keyboard
 from lexicons.lexicon_book_ru import LEXICON_BOOK_RU
-from lexicons.lexicons_user_ru import LEXICON_USER_RU
-from services.book_services import TIME_DATA
+from services.book_services import TIME_DATA, calculate_point_from_time
 from services.database_services import get_user_by_id, check_exists_book
 
 book_router = Router()
@@ -41,7 +39,7 @@ async def start_add_book(message: Message, state: FSMContext):
                              reply_markup=keyboard)
         return
 
-    await message.answer(LEXICON_USER_RU["start_add_book_without_books"])
+    await message.answer(LEXICON_BOOK_RU["start_add_book_without_books"])
 
 
 @book_router.message(StateFilter(BookState.book))
@@ -55,10 +53,14 @@ async def register_book(message: Message, state: FSMContext):
             book_query = insert(Book).values(
                 title=message.text.title(),
                 user_id=user.id
-            ).returning(Book.title)
+            ).returning(Book.id)
             result = await session.execute(book_query)
             await session.commit()
-            book = result.scalar()
+            book_id = result.scalar()
+            select_book_query = select(Book).where(
+                Book.id == book_id
+            )
+            book = await session.scalar(select_book_query)
 
     keyboard = create_time_keyboard()
     await state.update_data({"book": book})
@@ -110,6 +112,41 @@ async def register_time_cb(callback: CallbackQuery, state: FSMContext):
         await session.commit()
 
     text = (f"<b>Добавлено новое время чтения</b>\n\n"
-            f"Книга: {data.get('book')}\n"
+            f"Книга: {data.get('book').title}\n"
             f"Время: {TIME_DATA[key]} минут")
     await callback.message.answer(text)
+
+
+@book_router.message(StateFilter(BookState.time),
+                     BookTimeFilter())
+async def register_time(message: Message, state: FSMContext):
+    points, minutes = calculate_point_from_time(message.text)
+    user = await get_user_by_id(message.from_user.id)
+    data = await state.get_data()
+    await state.clear()
+
+    async with get_async_session() as session:
+        book_point_query = insert(BookPoint).values(
+            book_id=data.get("book").id,
+            user_id=user.id,
+            time=minutes
+        )
+        await session.execute(book_point_query)
+
+        user_point_query = select(UserPoint).where(
+            UserPoint.user_id == user.id
+        )
+        user_point = await session.scalar(user_point_query)
+        user_point.points += points
+
+        await session.commit()
+
+    text = (f"<b>Добавлено новое время чтения</b>\n\n"
+            f"Книга: {data.get('book').title}\n"
+            f"Время: {minutes} минут")
+    await message.answer(text)
+
+
+@book_router.message(StateFilter(BookState.time))
+async def error_register_time(message: Message):
+    await message.answer(LEXICON_BOOK_RU["error_start_add_time"])
