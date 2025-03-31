@@ -1,5 +1,9 @@
+from uuid import uuid4
+
+from slugify import slugify
 from sqlalchemy import (Column, Integer, BigInteger,
                         String, Boolean, ForeignKey)
+from sqlalchemy.event import listens_for
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -19,6 +23,7 @@ class User(Base):
     is_banned = Column(Boolean, nullable=False, default=False)
 
     user_point = relationship("UserPoint", lazy="selectin")
+    books = relationship("Book", lazy="selectin")
 
     def __repr__(self):
         return f"{self.name} {self.surname}"
@@ -32,3 +37,23 @@ class UserPoint(Base):
 
     def __repr__(self):
         return f"{self.user_id} - {self.points} очков"
+
+
+class Book(Base):
+    __tablename__ = "books"
+
+    title = Column(String(255), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    book_point = relationship("BookPoint", lazy="selectin")
+
+    def __repr__(self):
+        return self.title
+
+
+class BookPoint(Base):
+    __tablename__ = "book_points"
+
+    book_id = Column(Integer, ForeignKey("books.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    time = Column(Integer, nullable=False)
