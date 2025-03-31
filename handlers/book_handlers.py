@@ -4,8 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, CallbackQuery
-from pyexpat.errors import messages
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 
 from database.connect import get_async_session
 from database.models import Book
@@ -59,3 +58,19 @@ async def register_book(message: Message, state: FSMContext):
 
     await state.update_data({"book": book})
     await message.answer(LEXICON_BOOK_RU["start_add_time"])
+
+
+@book_router.callback_query(StateFilter(BookState.book))
+async def register_book_cb(callback: CallbackQuery, state: FSMContext):
+    _, index = callback.data.split("_")
+    user = await get_user_by_id(callback.from_user.id)
+    await state.set_state(BookState.time)
+
+    async with get_async_session() as session:
+        book_query = select(Book).where(
+            Book.user_id == user.id
+        ).order_by(Book.id.desc())
+        book = await session.scalars(book_query)
+
+    await state.update_data({"book": book.all()[int(index)]})
+    await callback.message.answer(LEXICON_BOOK_RU["start_add_time"])
