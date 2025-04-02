@@ -4,10 +4,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, CallbackQuery
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, update
 
 from database.connect import get_async_session
-from database.models import Book, BookPoint, UserPoint
+from database.models import Book, BookPoint, User
 from filters.book_filters import BookTimeFilter
 from keyboards.book_keyboards import create_list_book_keyboard, \
     create_time_keyboard
@@ -103,11 +103,10 @@ async def register_time_cb(callback: CallbackQuery, state: FSMContext):
         )
         await session.execute(book_point_query)
 
-        user_point_query = select(UserPoint).where(
-            UserPoint.user_id == user.id
-        )
-        user_point = await session.scalar(user_point_query)
-        user_point.points += TIME_DATA[key] / 10
+        update_user_query = update(User).where(
+            User.id == user.id
+        ).values(minutes=User.minutes + TIME_DATA[key])
+        await session.execute(update_user_query)
 
         await session.commit()
 
@@ -133,11 +132,10 @@ async def register_time(message: Message, state: FSMContext):
         )
         await session.execute(book_point_query)
 
-        user_point_query = select(UserPoint).where(
-            UserPoint.user_id == user.id
-        )
-        user_point = await session.scalar(user_point_query)
-        user_point.points += points
+        update_user_query = update(User).where(
+            User.id == user.id
+        ).values(minutes=User.minutes + minutes)
+        await session.execute(update_user_query)
 
         await session.commit()
 

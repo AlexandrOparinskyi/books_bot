@@ -18,8 +18,10 @@ class BookTimeFilter(BaseFilter):
             return True
         if len(message.text.split(" ")) == 4:
             num_hour, hour, num_minute, minute = message.text.split(" ")
-            if hour not in HOURS and minute not in MINUTES:
+            print(num_hour, hour, num_minute, minute)
+            if hour not in HOURS or minute not in MINUTES:
                 return False
-            if not num_minute.isdigit() and not minute.isdigit():
+            if not num_minute.isdigit() or not num_hour.isdigit():
                 return False
+            return True
         return False
