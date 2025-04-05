@@ -117,3 +117,20 @@ async def finish_change_surname(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(LEXICON_PROFILE_RU["changed"])
     await get_profile(message)
+
+
+@profile_router.callback_query(F.data == "profile_watch_points")
+async def profile_watch_points(callback: CallbackQuery):
+    user = await get_user_by_id(callback.from_user.id)
+    text = "<b>20 последних занятий чтением:</b>\n\n"
+    async with get_async_session() as session:
+        books_query = select(BookPoint).where(
+            BookPoint.user_id == user.id
+        ).order_by(BookPoint.id.desc()).limit(20)
+        books = await session.scalars(books_query)
+
+        for book in books:
+            text += f" - Книга {book.book}, время чтения {book.time} минут\n"
+
+    await callback.message.answer(text)
+
