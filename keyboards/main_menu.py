@@ -19,6 +19,10 @@ async def create_main_menu(bot: Bot):
         BotCommand(
             command="/add_book",
             description="Добавить время чтения"
+        ),
+        BotCommand(
+            command="/get_rating",
+            description="Список лидеров"
         )
     ]
     await bot.set_my_commands(main_menu)

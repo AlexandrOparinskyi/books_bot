@@ -18,7 +18,7 @@ def create_profile_keyboard() -> InlineKeyboardMarkup:
             callback_data="profile_change_age"
         ),
         InlineKeyboardButton(
-            text="Посмотреть свои часы чтения",
+            text="Статистика чтения",
             callback_data="profile_watch_points"
         ),
         width=2

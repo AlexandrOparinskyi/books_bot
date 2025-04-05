@@ -31,7 +31,9 @@ class Book(Base):
     title = Column(String(255), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    book_point = relationship("BookPoint", lazy="selectin")
+    book_point = relationship("BookPoint",
+                              back_populates="book",
+                              lazy="selectin")
 
     def __repr__(self):
         return self.title
@@ -43,3 +45,7 @@ class BookPoint(Base):
     book_id = Column(Integer, ForeignKey("books.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     time = Column(Integer, nullable=False)
+
+    book = relationship("Book",
+                        back_populates="book_point",
+                        lazy="selectin")
