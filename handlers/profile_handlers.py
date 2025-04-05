@@ -1,7 +1,10 @@
-from aiogram import Router
-from aiogram.filters import Command
-from aiogram.types import Message
-from sqlalchemy import select, func
+from aiogram import Router, F
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import Message, CallbackQuery
+from sqlalchemy import select, update
 
 from database.connect import get_async_session
 from database.models import BookPoint, User
@@ -11,6 +14,13 @@ from services.database_services import get_user_by_id
 from services.profile_services import get_rating
 
 profile_router = Router()
+storage = MemoryStorage()
+
+
+class ProfileState(StatesGroup):
+    name = State()
+    surname = State()
+    age = State()
 
 
 @profile_router.message(Command(commands="profile"))
@@ -40,3 +50,70 @@ async def get_profile(message: Message):
 
     keyboard = create_profile_keyboard()
     await message.answer(text, reply_markup=keyboard)
+
+
+@profile_router.callback_query(lambda x: x.data in ("profile_change_name",
+                                                    "profile_change_surname",
+                                                    "profile_change_age"))
+async def get_state_for_change_data(callback: CallbackQuery,
+                                    state: FSMContext):
+    if callback.data == "profile_change_name":
+        await state.set_state(ProfileState.name)
+        await callback.message.answer(LEXICON_PROFILE_RU["change_name"])
+        return
+    if callback.data == "profile_change_surname":
+        await state.set_state(ProfileState.surname)
+        await callback.message.answer(LEXICON_PROFILE_RU["change_surname"])
+        return
+    if callback.data == "profile_change_age":
+        await state.set_state(ProfileState.age)
+        await callback.message.answer(LEXICON_PROFILE_RU["change_age"])
+        return
+
+
+@profile_router.message(StateFilter(ProfileState.name),
+                        lambda x: len(x.text.split(" ")) == 1)
+async def finish_change_name(message: Message, state: FSMContext):
+    user = await get_user_by_id(message.from_user.id)
+    async with get_async_session() as session:
+        update_user_query = update(User).where(
+            User.id == user.id
+        ).values(name=message.text.title())
+        await session.execute(update_user_query)
+        await session.commit()
+
+    await state.clear()
+    await message.answer(LEXICON_PROFILE_RU["changed"])
+    await get_profile(message)
+
+
+@profile_router.message(StateFilter(ProfileState.surname),
+                        lambda x: len(x.text.split(" ")) == 1)
+async def finish_change_surname(message: Message, state: FSMContext):
+    user = await get_user_by_id(message.from_user.id)
+    async with get_async_session() as session:
+        update_user_query = update(User).where(
+            User.id == user.id
+        ).values(surname=message.text.title())
+        await session.execute(update_user_query)
+        await session.commit()
+
+    await state.clear()
+    await message.answer(LEXICON_PROFILE_RU["changed"])
+    await get_profile(message)
+
+
+@profile_router.message(StateFilter(ProfileState.age),
+                        F.text.isdigit())
+async def finish_change_surname(message: Message, state: FSMContext):
+    user = await get_user_by_id(message.from_user.id)
+    async with get_async_session() as session:
+        update_user_query = update(User).where(
+            User.id == user.id
+        ).values(age=int(message.text))
+        await session.execute(update_user_query)
+        await session.commit()
+
+    await state.clear()
+    await message.answer(LEXICON_PROFILE_RU["changed"])
+    await get_profile(message)
